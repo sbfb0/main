@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>sbfb Playground</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; }
+        textarea { width: 100%; height: 150px; font-family: monospace; font-size: 16px; padding: 10px; }
+        button { background-color: #4CAF50; color: white; padding: 10px 20px; border: none; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        button:hover { background-color: #45a049; }
+        .output-box { background-color: black; color: #00FF00; padding: 15px; margin-top: 20px; font-family: monospace; white-space: pre-wrap; min-height: 100px; }
+    </style>
+</head>
+<body>
+
+    <h1>Try sbfb Live!</h1>
+    <p>Write your sbfb code below and hit Run:</p>
+
+    <textarea id="codeInput">
+start:sbfb
+idk(frontend)
+type ("hello world")
+<end></textarea>
+
+    <button onclick="runSBFB()">Run Code</button>
+
+    <div class="output-box" id="outputScreen">Waiting for code...</div>
+
+    <script>
+        function runSBFB() {
+            // Get the code from the text box
+            const code = document.getElementById("codeInput").value;
+            const output = document.getElementById("outputScreen");
+            
+            // Clear the old output
+            output.innerText = "--- Running sbfb Program ---\n";
+
+            // Split the code line by line
+            const lines = code.split('\n');
+            let isRunning = false;
+
+            for (let i = 0; i < lines.length; i++) {
+                // Remove extra spaces from the line
+                let line = lines[i].trim();
+                if (line === "") continue;
+
+                if (line === "start:sbfb") {
+                    isRunning = true;
+                    continue;
+                }
+                
+                if (line === "<end>") {
+                    output.innerText += "--- Program Finished ---\n";
+                    isRunning = false;
+                    break;
+                }
+
+                if (isRunning) {
+                    // Check for idk(...)
+                    if (line.startsWith("idk(") && line.endsWith(")")) {
+                        let env = line.substring(4, line.length - 1);
+                        output.innerText += `[System Note: Setting up ${env} environment...]\n`;
+                    }
+                    // Check for type ("...")
+                    else if (line.startsWith('type ("') && line.endsWith('")')) {
+                        let text = line.substring(7, line.length - 2);
+                        output.innerText += text + "\n";
+                    }
+                    else {
+                        output.innerText += `Syntax Error: Unknown command '${line}'\n`;
+                    }
+                }
+            }
+        }
+    </script>
+
+</body>
+</html>
