@@ -18,6 +18,9 @@
         .browser-preview { flex: 2; background-color: #ffffff; border: none; border-radius: 0 0 5px 5px; margin-bottom: 20px; width: 100%; }
         
         .terminal { flex: 1; background-color: #000000; color: #00FF00; padding: 15px; font-family: monospace; white-space: pre-wrap; overflow-y: auto; border-radius: 5px; border: 1px solid #333; }
+        
+        /* Special color for AI messages */
+        .ai-text { color: #00d2ff; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -28,23 +31,17 @@
         <div class="panel">
             <textarea id="codeInput" spellcheck="false">
 start:SBFB
-frontend
+idk
 
-type ("Building the webpage...")
+insert:tool brain ai
 
-insert html (index.html)
-<div style="text-align: center; margin-top: 50px; font-family: Arial;">
-    <h1 id="myTitle">Hello from HTML!</h1>
-    <button id="myBtn" style="padding: 10px 20px; cursor: pointer;">Change Color</button>
-</div>
+{
+you are isaahi ai. you will be a helpful chatbot like gemini, claud, and chatgpt.
+}
 
-insert javascript (script.js)
-document.getElementById("myBtn").onclick = function() {
-    document.getElementById("myTitle").style.color = "red";
-    document.getElementById("myTitle").innerText = "JavaScript is alive!";
-};
+tool:crawl [https://sbfb0.github.io/main/]
 
-<end:sbfb></textarea>
+<end:SBFB></textarea>
             <button onclick="runSBFB()">Run sbfb Code</button>
         </div>
 
@@ -63,9 +60,8 @@ document.getElementById("myBtn").onclick = function() {
             const terminal = document.getElementById("outputScreen");
             const preview = document.getElementById("webPreview");
             
-            terminal.innerText = "--- Running sbfb Program ---\n";
+            terminal.innerHTML = "--- Running sbfb Program ---\n";
             
-            // Collect HTML and JS separately
             let htmlContent = ""; 
             let jsContent = "";
 
@@ -73,7 +69,12 @@ document.getElementById("myBtn").onclick = function() {
             let isRunning = false;
             let isPythonMode = false; 
             let isHtmlMode = false; 
-            let isJsMode = false; // NEW: Tracks JavaScript mode
+            let isJsMode = false; 
+            
+            // AI Brain Variables
+            let isBrainMode = false;
+            let isCapturingPrompt = false;
+            let aiPrompt = "";
 
             for (let i = 0; i < lines.length; i++) {
                 let line = lines[i].trim();
@@ -87,62 +88,87 @@ document.getElementById("myBtn").onclick = function() {
                 }
                 
                 if (line.toLowerCase() === "<end>" || line.toLowerCase() === "<end:sbfb>") {
-                    terminal.innerText += "--- Program Finished ---\n";
+                    terminal.innerHTML += "--- Program Finished ---\n";
                     isRunning = false;
-                    isPythonMode = false; 
-                    isHtmlMode = false; 
-                    isJsMode = false;
                     break;
                 }
 
                 if (isRunning) {
                     // --- ENVIRONMENT COMMANDS ---
                     if (line.toLowerCase() === "frontend") {
-                        terminal.innerText += "[System Note: Environment locked to FRONTEND]\n";
+                        terminal.innerHTML += "[System Note: Environment locked to FRONTEND]\n";
                         continue;
                     }
                     if (line.toLowerCase() === "backend") {
-                        terminal.innerText += "[System Note: Environment locked to BACKEND]\n";
+                        terminal.innerHTML += "[System Note: Environment locked to BACKEND]\n";
                         continue;
                     }
                     if (line.toLowerCase() === "idk") {
-                        terminal.innerText += "[System Note: Environment UNKNOWN (Could be Frontend or Backend)]\n";
-                        continue;
-                    }
-                    // (Kept for backwards compatibility)
-                    if (line.startsWith("idk(") && line.endsWith(")")) {
-                        let env = line.substring(4, line.length - 1);
-                        terminal.innerText += `[System Note: Environment set to ${env}]\n`;
+                        terminal.innerHTML += "[System Note: Environment UNKNOWN (Could be Frontend or Backend)]\n";
                         continue;
                     }
 
                     // --- MODE SWITCHERS ---
+                    if (line.toLowerCase() === "insert:tool brain ai") {
+                        terminal.innerHTML += `[System Note: Initializing Isaahi AI Brain...]\n`;
+                        isBrainMode = true; isPythonMode = false; isHtmlMode = false; isJsMode = false;
+                        continue; 
+                    }
+                    
                     if (line.toLowerCase().startsWith("insert python (") && line.endsWith(")")) {
                         let filename = line.substring(15, line.length - 1);
-                        terminal.innerText += `[System Note: Inserting Python script '${filename}']\n`;
-                        isPythonMode = true; isHtmlMode = false; isJsMode = false;
+                        terminal.innerHTML += `[System Note: Inserting Python script '${filename}']\n`;
+                        isPythonMode = true; isHtmlMode = false; isJsMode = false; isBrainMode = false;
                         continue; 
                     }
                     if (line.toLowerCase().startsWith("insert html (") && line.endsWith(")")) {
                         let filename = line.substring(13, line.length - 1);
-                        terminal.innerText += `[System Note: Rendering HTML script '${filename}']\n`;
-                        isHtmlMode = true; isPythonMode = false; isJsMode = false;
+                        terminal.innerHTML += `[System Note: Rendering HTML script '${filename}']\n`;
+                        isHtmlMode = true; isPythonMode = false; isJsMode = false; isBrainMode = false;
                         continue; 
                     }
                     if (line.toLowerCase().startsWith("insert javascript (") && line.endsWith(")")) {
                         let filename = line.substring(19, line.length - 1);
-                        terminal.innerText += `[System Note: Loading JavaScript '${filename}']\n`;
-                        isJsMode = true; isHtmlMode = false; isPythonMode = false;
+                        terminal.innerHTML += `[System Note: Loading JavaScript '${filename}']\n`;
+                        isJsMode = true; isHtmlMode = false; isPythonMode = false; isBrainMode = false;
                         continue; 
                     }
 
-                    // --- MODE LOGIC ---
+                    // --- AI BRAIN LOGIC ---
+                    if (isBrainMode) {
+                        if (line === "{") {
+                            isCapturingPrompt = true;
+                            continue;
+                        }
+                        if (line === "}") {
+                            isCapturingPrompt = false;
+                            terminal.innerHTML += `[System Note: Personality prompt for Isaahi AI registered]\n`;
+                            continue;
+                        }
+                        if (isCapturingPrompt) {
+                            aiPrompt += rawLine + "\n";
+                            continue;
+                        }
+
+                        if (line.toLowerCase().startsWith("tool:crawl [") && line.endsWith("]")) {
+                            let url = line.substring(12, line.length - 1);
+                            terminal.innerHTML += `[System Note: Tool Triggered. Crawling ${url}...]\n`;
+                            
+                            // Simulate the AI taking a moment to read the website!
+                            setTimeout(() => {
+                                terminal.innerHTML += `<span class="ai-text">\nIsaahi AI: I have successfully crawled the data from ${url}. I am ready to help you!</span>\n`;
+                            }, 1500);
+                            continue;
+                        }
+                    }
+
+                    // --- OTHER MODES ---
                     if (isPythonMode) {
                         if (line.startsWith('print("') && line.endsWith('")')) {
                             let text = line.substring(7, line.length - 2);
-                            terminal.innerText += text + "\n";
+                            terminal.innerHTML += text + "\n";
                         } else {
-                            terminal.innerText += `Python Error: sbfb's mini-python doesn't recognize '${line}' yet\n`;
+                            terminal.innerHTML += `Python Error: sbfb's mini-python doesn't recognize '${line}' yet\n`;
                         }
                         continue;
                     }
@@ -160,15 +186,11 @@ document.getElementById("myBtn").onclick = function() {
                     // --- STANDARD COMMANDS ---
                     if (line.startsWith('type ("') && line.endsWith('")')) {
                         let text = line.substring(7, line.length - 2);
-                        terminal.innerText += text + "\n";
-                    }
-                    else {
-                        terminal.innerText += `Syntax Error: Unknown command '${line}'\n`;
+                        terminal.innerHTML += text + "\n";
                     }
                 }
             }
 
-            // Combine HTML and JS, then inject it into the live preview!
             let finalWebCode = htmlContent + "\n<script>" + jsContent + "<\/script>";
             preview.srcdoc = finalWebCode;
         }
