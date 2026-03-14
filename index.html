@@ -1,62 +1,89 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>sbfb Playground</title>
+    <title>sbfb Studio</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; }
-        textarea { width: 100%; height: 250px; font-family: monospace; font-size: 16px; padding: 10px; }
-        button { background-color: #4CAF50; color: white; padding: 10px 20px; border: none; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #1e1e1e; color: #fff; }
+        h1 { margin-top: 0; font-size: 24px; color: #4CAF50; }
+        
+        /* Split Screen Layout */
+        .workspace { display: flex; gap: 20px; height: calc(100vh - 100px); }
+        .panel { flex: 1; display: flex; flex-direction: column; }
+        
+        /* Code Editor Panel */
+        textarea { flex: 1; background-color: #2d2d2d; color: #d4d4d4; font-family: 'Courier New', Courier, monospace; font-size: 15px; padding: 15px; border: 1px solid #444; border-radius: 5px; resize: none; outline: none; }
+        button { background-color: #4CAF50; color: white; padding: 12px 20px; border: none; cursor: pointer; font-size: 16px; border-radius: 5px; margin-top: 10px; font-weight: bold; }
         button:hover { background-color: #45a049; }
-        .output-box { background-color: black; color: #00FF00; padding: 15px; margin-top: 20px; font-family: monospace; white-space: pre-wrap; min-height: 150px; }
+        
+        /* Preview & Terminal Panel */
+        .preview-header { background: #333; padding: 5px 15px; border-radius: 5px 5px 0 0; font-size: 14px; font-weight: bold; color: #ccc; }
+        .browser-preview { flex: 2; background-color: #ffffff; border: none; border-radius: 0 0 5px 5px; margin-bottom: 20px; width: 100%; }
+        
+        .terminal { flex: 1; background-color: #000000; color: #00FF00; padding: 15px; font-family: monospace; white-space: pre-wrap; overflow-y: auto; border-radius: 5px; border: 1px solid #333; }
     </style>
 </head>
 <body>
 
-    <h1>Try sbfb Live!</h1>
-    <p>Write your sbfb code below and hit Run:</p>
+    <h1>sbfb Studio</h1>
 
-    <textarea id="codeInput">
+    <div class="workspace">
+        <div class="panel">
+            <textarea id="codeInput" spellcheck="false">
 start:SBFB
 idk(frontend)
 
+type ("Initializing webpage...")
+
 insert html (index.html)
-<h1>Hello from HTML!</h1>
-<p>This is a paragraph inside sbfb.</p>
+<div style="text-align: center; margin-top: 50px;">
+    <h1 style="color: blue;">Welcome to the SBFB Web Preview!</h1>
+    <p>This HTML is actually rendering in real-time.</p>
+    <button style="background: blue; color: white; padding: 10px;">Click Me!</button>
+</div>
 
 <end:sbfb></textarea>
+            <button onclick="runSBFB()">Run sbfb Code</button>
+        </div>
 
-    <button onclick="runSBFB()">Run Code</button>
+        <div class="panel">
+            <div class="preview-header">Live Web Preview</div>
+            <iframe id="webPreview" class="browser-preview"></iframe>
 
-    <div class="output-box" id="outputScreen">Waiting for code...</div>
+            <div class="preview-header" style="margin-top: 10px;">Terminal Output</div>
+            <div class="terminal" id="outputScreen">Waiting for code...</div>
+        </div>
+    </div>
 
     <script>
         function runSBFB() {
             const code = document.getElementById("codeInput").value;
-            const output = document.getElementById("outputScreen");
+            const terminal = document.getElementById("outputScreen");
+            const preview = document.getElementById("webPreview");
             
-            output.innerText = "--- Running sbfb Program ---\n";
+            terminal.innerText = "--- Running sbfb Program ---\n";
+            
+            // This string will collect all the HTML code the user types
+            let htmlContent = ""; 
 
             const lines = code.split('\n');
             let isRunning = false;
             let isPythonMode = false; 
-            let isHtmlMode = false; // NEW: Tracks if we are inside an HTML block
+            let isHtmlMode = false; 
 
             for (let i = 0; i < lines.length; i++) {
-                // We use trim() to ignore extra spaces, but keep the original line for HTML
                 let line = lines[i].trim();
                 let rawLine = lines[i]; 
                 
                 if (line === "") continue;
 
-                // Made case-insensitive so start:sbfb or start:SBFB both work!
                 if (line.toLowerCase() === "start:sbfb") {
                     isRunning = true;
                     continue;
                 }
                 
-                // Accepts <end> or <end:sbfb>
                 if (line.toLowerCase() === "<end>" || line.toLowerCase() === "<end:sbfb>") {
-                    output.innerText += "--- Program Finished ---\n";
+                    terminal.innerText += "--- Program Finished ---\n";
                     isRunning = false;
                     isPythonMode = false; 
                     isHtmlMode = false; 
@@ -64,56 +91,55 @@ insert html (index.html)
                 }
 
                 if (isRunning) {
-                    // 1. Check for Python Mode
                     if (line.toLowerCase().startsWith("insert python (") && line.endsWith(")")) {
                         let filename = line.substring(15, line.length - 1);
-                        output.innerText += `[System Note: Inserting Python script '${filename}']\n`;
+                        terminal.innerText += `[System Note: Inserting Python script '${filename}']\n`;
                         isPythonMode = true;
-                        isHtmlMode = false; // Turn off HTML mode
+                        isHtmlMode = false; 
                         continue; 
                     }
 
-                    // 2. Check for HTML Mode
                     if (line.toLowerCase().startsWith("insert html (") && line.endsWith(")")) {
                         let filename = line.substring(13, line.length - 1);
-                        output.innerText += `[System Note: Inserting HTML script '${filename}']\n`;
+                        terminal.innerText += `[System Note: Rendering HTML script '${filename}']\n`;
                         isHtmlMode = true;
-                        isPythonMode = false; // Turn off Python mode
+                        isPythonMode = false; 
                         continue; 
                     }
 
-                    // 3. Python Mode Logic
                     if (isPythonMode) {
                         if (line.startsWith('print("') && line.endsWith('")')) {
                             let text = line.substring(7, line.length - 2);
-                            output.innerText += text + "\n";
+                            terminal.innerText += text + "\n";
                         } else {
-                            output.innerText += `Python Error: sbfb's mini-python doesn't recognize '${line}' yet\n`;
+                            terminal.innerText += `Python Error: sbfb's mini-python doesn't recognize '${line}' yet\n`;
                         }
                         continue;
                     }
 
-                    // 4. HTML Mode Logic
                     if (isHtmlMode) {
-                        // Just print the HTML exactly as the user typed it!
-                        output.innerText += rawLine + "\n";
+                        // Instead of printing to the terminal, we add it to our hidden HTML string!
+                        htmlContent += rawLine + "\n";
                         continue;
                     }
 
-                    // 5. Normal sbfb Commands
+                    // Normal sbfb Commands
                     if (line.startsWith("idk(") && line.endsWith(")")) {
                         let env = line.substring(4, line.length - 1);
-                        output.innerText += `[System Note: Setting up ${env} environment...]\n`;
+                        terminal.innerText += `[System Note: Setting up ${env} environment...]\n`;
                     }
                     else if (line.startsWith('type ("') && line.endsWith('")')) {
                         let text = line.substring(7, line.length - 2);
-                        output.innerText += text + "\n";
+                        terminal.innerText += text + "\n";
                     }
                     else {
-                        output.innerText += `Syntax Error: Unknown command '${line}'\n`;
+                        terminal.innerText += `Syntax Error: Unknown command '${line}'\n`;
                     }
                 }
             }
+
+            // At the very end, inject the collected HTML into the iframe preview box!
+            preview.srcdoc = htmlContent;
         }
     </script>
 
