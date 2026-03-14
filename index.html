@@ -31,6 +31,7 @@
         
         .ai-text { color: #00d2ff; font-weight: bold; }
         .error-text { color: #ff5555; }
+        .var-text { color: #ffb86c; } /* Color for variable outputs */
     </style>
 </head>
 <body>
@@ -47,10 +48,22 @@
         <div class="panel">
             <textarea id="codeInput" spellcheck="false">
 start:SBFB
-idk
+frontend
 
-import:python (test.py)
-print ("hi")
+type ("--- Testing SBFB Memory ---")
+
+let myName = "Creator"
+let loopCount = 3
+
+type ("Welcome to the system, ")
+type (myName)
+
+type ("")
+type ("--- Testing SBFB Loops ---")
+
+repeat loopCount {
+    type ("SBFB is looping!")
+}
 
 <end:SBFB></textarea>
             <button class="btn" onclick="runSBFB()">Run sbfb Code</button>
@@ -113,9 +126,9 @@ print ("hi")
             return aiMessage;
         }
 
-        // --- SBFB PARSER ENGINE ---
+        // --- CORE SBFB ENGINE ---
         async function runSBFB() {
-            saveApiKey(); // Auto-save key
+            saveApiKey(); 
 
             const code = document.getElementById("codeInput").value;
             const terminal = document.getElementById("outputScreen");
@@ -127,114 +140,172 @@ print ("hi")
             chatHistory = []; 
             
             let htmlContent = ""; let jsContent = "";
-            let isRunning = false, isBrainMode = false, isCapturingPrompt = false;
-            let isPythonMode = false, isHtmlMode = false, isJsMode = false;
-            let aiPrompt = "";
+            let isRunning = false;
+            
+            // --- NEW: SBFB MEMORY SYSTEM ---
+            let memory = {}; 
+            const allLines = code.split('\n');
 
-            const lines = code.split('\n');
+            // We wrap the parser in an async function so it can call itself for loops!
+            async function processLines(linesArray) {
+                let isBrainMode = false, isCapturingPrompt = false;
+                let isPythonMode = false, isHtmlMode = false, isJsMode = false;
+                let aiPrompt = "";
 
-            for (let i = 0; i < lines.length; i++) {
-                let line = lines[i].trim();
-                let lowerLine = line.toLowerCase();
-                let rawLine = lines[i]; 
-                
-                if (line === "") continue;
+                for (let i = 0; i < linesArray.length; i++) {
+                    let line = linesArray[i].trim();
+                    let lowerLine = line.toLowerCase();
+                    let rawLine = linesArray[i]; 
+                    
+                    if (line === "") continue;
 
-                if (lowerLine === "start:sbfb") { isRunning = true; continue; }
-                if (lowerLine === "<end>" || lowerLine === "<end:sbfb>") {
-                    terminal.innerHTML += "--- Program Finished ---\n";
-                    isRunning = false; break;
-                }
-
-                if (isRunning) {
-                    // --- ENVIRONMENT RULES ---
-                    if (lowerLine === "idk") { terminal.innerHTML += "[System Note: Environment UNKNOWN]\n"; continue; }
-                    if (lowerLine === "frontend") { terminal.innerHTML += "[System Note: Environment FRONTEND]\n"; continue; }
-                    if (lowerLine === "backend") { terminal.innerHTML += "[System Note: Environment BACKEND]\n"; continue; }
-
-                    // --- AI BRAIN ---
-                    if (lowerLine === "insert:tool brain ai" || lowerLine === "import:tool brain ai") {
-                        terminal.innerHTML += `[System Note: Initializing Isaahi AI Brain...]\n`;
-                        isBrainMode = true; isPythonMode = false; isHtmlMode = false; isJsMode = false;
-                        continue; 
+                    if (lowerLine === "start:sbfb") { isRunning = true; continue; }
+                    if (lowerLine === "<end>" || lowerLine === "<end:sbfb>") {
+                        if (linesArray === allLines) terminal.innerHTML += "--- Program Finished ---\n";
+                        isRunning = false; break;
                     }
 
-                    if (isBrainMode) {
-                        if (line === "{") { isCapturingPrompt = true; continue; }
-                        if (line === "}") { 
-                            isCapturingPrompt = false; currentAiPrompt = aiPrompt; 
-                            terminal.innerHTML += `[System Note: Personality prompt for Isaahi AI registered. Chat unlocked!]\n`;
-                            chatBox.style.display = "flex"; continue; 
+                    if (isRunning) {
+                        // --- 1. VARIABLE ASSIGNMENT (let x = 10) ---
+                        if (lowerLine.startsWith("let ") && line.includes("=")) {
+                            let parts = line.substring(4).split("=");
+                            let varName = parts[0].trim();
+                            let varVal = parts[1].trim();
+                            
+                            // Strip quotes if it's a string
+                            if (varVal.startsWith('"') && varVal.endsWith('"')) {
+                                varVal = varVal.substring(1, varVal.length - 1);
+                            } else if (!isNaN(varVal)) {
+                                varVal = Number(varVal); // Save as an actual number
+                            } else if (memory[varVal] !== undefined) {
+                                varVal = memory[varVal]; // Assign another variable to this one
+                            }
+                            
+                            memory[varName] = varVal; // Save to memory!
+                            continue;
                         }
-                        if (isCapturingPrompt) { aiPrompt += rawLine + "\n"; continue; }
 
-                        if (lowerLine.startsWith("tool:crawl [") && line.endsWith("]")) {
-                            let url = line.substring(12, line.length - 1);
-                            terminal.innerHTML += `[System Note: Tool Triggered. Crawling ${url}...]\n`;
-                            try {
-                                terminal.innerHTML += `<span style="color:gray;" id="loadingIndicator">Isaahi is thinking...</span>\n`;
-                                let aiResponse = await callGroqAPI(aiPrompt, `I just ran a crawl tool on ${url}. Acknowledge this and tell me you are ready to help.`);
-                                document.getElementById("loadingIndicator").remove();
-                                terminal.innerHTML += `<span class="ai-text">\nIsaahi AI: ${aiResponse}</span>\n\n`;
-                            } catch (error) {
-                                if (document.getElementById("loadingIndicator")) document.getElementById("loadingIndicator").remove();
-                                terminal.innerHTML += `<span class="error-text">${error.message}</span>\n`;
+                        // --- 2. REPEAT LOOPS ---
+                        if (lowerLine.startsWith("repeat ") && lowerLine.endsWith("{")) {
+                            let countStr = lowerLine.substring(7, lowerLine.length - 1).trim();
+                            // Check if the count is a number, or a variable stored in memory!
+                            let count = isNaN(countStr) ? memory[countStr] : parseInt(countStr);
+                            
+                            if (count === undefined) {
+                                terminal.innerHTML += `<span class="error-text">Loop Error: Cannot repeat '${countStr}' times.</span>\n`;
+                                continue;
+                            }
+
+                            // Gather the lines inside the loop brackets
+                            let loopBody = [];
+                            let brackets = 1;
+                            i++; // Move to next line
+                            
+                            while(i < linesArray.length && brackets > 0) {
+                                let innerLine = linesArray[i].trim();
+                                if (innerLine.endsWith("{")) brackets++;
+                                if (innerLine === "}") brackets--;
+                                
+                                if (brackets > 0) loopBody.push(linesArray[i]);
+                                i++;
+                            }
+                            i--; // Step back so the main loop doesn't skip a line
+
+                            // Execute the block!
+                            for (let c = 0; c < count; c++) {
+                                await processLines(loopBody);
                             }
                             continue;
                         }
-                    }
 
-                    // --- MODE SWITCHERS (Supports both 'import:' and 'insert') ---
-                    if ((lowerLine.startsWith("insert python (") || lowerLine.startsWith("import:python (")) && line.endsWith(")")) {
-                        let prefix = lowerLine.startsWith("insert") ? 15 : 15;
-                        let filename = line.substring(prefix, line.length - 1);
-                        terminal.innerHTML += `[System Note: Loading Python script '${filename}']\n`;
-                        isPythonMode = true; isHtmlMode = false; isJsMode = false; isBrainMode = false;
-                        continue; 
-                    }
-                    if ((lowerLine.startsWith("insert html (") || lowerLine.startsWith("import:html (")) && line.endsWith(")")) {
-                        let prefix = lowerLine.startsWith("insert") ? 13 : 13;
-                        let filename = line.substring(prefix, line.length - 1);
-                        terminal.innerHTML += `[System Note: Rendering HTML script '${filename}']\n`;
-                        isHtmlMode = true; isPythonMode = false; isJsMode = false; isBrainMode = false;
-                        continue; 
-                    }
-                    if ((lowerLine.startsWith("insert javascript (") || lowerLine.startsWith("import:javascript (")) && line.endsWith(")")) {
-                        let prefix = lowerLine.startsWith("insert") ? 19 : 19;
-                        let filename = line.substring(prefix, line.length - 1);
-                        terminal.innerHTML += `[System Note: Loading JavaScript '${filename}']\n`;
-                        isJsMode = true; isHtmlMode = false; isPythonMode = false; isBrainMode = false;
-                        continue; 
-                    }
-
-                    // --- PYTHON MODE LOGIC ---
-                    if (isPythonMode) {
-                        // We remove spaces just to check if it says print("..."), allowing print ("...") 
-                        let noSpaceLine = line.replace(/\s+/g, ''); 
-                        if (noSpaceLine.startsWith('print("') && noSpaceLine.endsWith('")')) {
-                            // Extract the text carefully from the original line to keep formatting
-                            let firstQuote = line.indexOf('"');
-                            let lastQuote = line.lastIndexOf('"');
-                            let text = line.substring(firstQuote + 1, lastQuote);
-                            terminal.innerHTML += text + "\n";
-                        } else {
-                            terminal.innerHTML += `Python Error: sbfb's mini-python doesn't recognize '${line}' yet\n`;
+                        // --- 3. STANDARD SBFB COMMANDS ---
+                        let noSpaceSbfb = line.replace(/\s+/g, '');
+                        
+                        // Print literal strings: type ("hello")
+                        if (noSpaceSbfb.startsWith('type("') && noSpaceSbfb.endsWith('")')) {
+                            let firstQ = line.indexOf('"'); let lastQ = line.lastIndexOf('"');
+                            terminal.innerHTML += line.substring(firstQ + 1, lastQ) + "\n";
+                            continue;
+                        } 
+                        // Print variables: type (myName)
+                        else if (noSpaceSbfb.startsWith('type(') && noSpaceSbfb.endsWith(')')) {
+                            let varName = noSpaceSbfb.substring(5, noSpaceSbfb.length - 1);
+                            if (memory[varName] !== undefined) {
+                                terminal.innerHTML += `<span class="var-text">${memory[varName]}</span>\n`;
+                            } else {
+                                terminal.innerHTML += `<span class="error-text">SBFB Error: '${varName}' is not defined</span>\n`;
+                            }
+                            continue;
                         }
-                        continue;
-                    }
 
-                    // --- HTML & JS MODE LOGIC ---
-                    if (isHtmlMode) { htmlContent += rawLine + "\n"; continue; }
-                    if (isJsMode) { jsContent += rawLine + "\n"; continue; }
+                        // --- ENVIRONMENT RULES ---
+                        if (lowerLine === "idk") { terminal.innerHTML += "[System Note: Environment UNKNOWN]\n"; continue; }
+                        if (lowerLine === "frontend") { terminal.innerHTML += "[System Note: Environment FRONTEND]\n"; continue; }
+                        if (lowerLine === "backend") { terminal.innerHTML += "[System Note: Environment BACKEND]\n"; continue; }
 
-                    // --- STANDARD SBFB COMMANDS ---
-                    let noSpaceSbfb = line.replace(/\s+/g, '');
-                    if (noSpaceSbfb.startsWith('type("') && noSpaceSbfb.endsWith('")')) {
-                        let firstQ = line.indexOf('"'); let lastQ = line.lastIndexOf('"');
-                        terminal.innerHTML += line.substring(firstQ + 1, lastQ) + "\n";
+                        // --- AI BRAIN ---
+                        if (lowerLine === "insert:tool brain ai" || lowerLine === "import:tool brain ai") {
+                            terminal.innerHTML += `[System Note: Initializing Isaahi AI Brain...]\n`;
+                            isBrainMode = true; isPythonMode = false; isHtmlMode = false; isJsMode = false;
+                            continue; 
+                        }
+
+                        if (isBrainMode) {
+                            if (line === "{") { isCapturingPrompt = true; continue; }
+                            if (line === "}") { 
+                                isCapturingPrompt = false; currentAiPrompt = aiPrompt; 
+                                terminal.innerHTML += `[System Note: Personality prompt for Isaahi AI registered. Chat unlocked!]\n`;
+                                chatBox.style.display = "flex"; continue; 
+                            }
+                            if (isCapturingPrompt) { aiPrompt += rawLine + "\n"; continue; }
+                            // ... AI Crawl Logic
+                            if (lowerLine.startsWith("tool:crawl [") && line.endsWith("]")) {
+                                let url = line.substring(12, line.length - 1);
+                                terminal.innerHTML += `[System Note: Tool Triggered. Crawling ${url}...]\n`;
+                                try {
+                                    terminal.innerHTML += `<span style="color:gray;" id="loadingIndicator">Isaahi is thinking...</span>\n`;
+                                    let aiResponse = await callGroqAPI(aiPrompt, `I just ran a crawl tool on ${url}. Acknowledge this and tell me you are ready to help.`);
+                                    document.getElementById("loadingIndicator").remove();
+                                    terminal.innerHTML += `<span class="ai-text">\nIsaahi AI: ${aiResponse}</span>\n\n`;
+                                } catch (error) {
+                                    if (document.getElementById("loadingIndicator")) document.getElementById("loadingIndicator").remove();
+                                    terminal.innerHTML += `<span class="error-text">${error.message}</span>\n`;
+                                }
+                                continue;
+                            }
+                        }
+
+                        // --- MODE SWITCHERS ---
+                        if ((lowerLine.startsWith("insert python (") || lowerLine.startsWith("import:python (")) && line.endsWith(")")) {
+                            let prefix = lowerLine.startsWith("insert") ? 15 : 15;
+                            let filename = line.substring(prefix, line.length - 1);
+                            terminal.innerHTML += `[System Note: Loading Python script '${filename}']\n`;
+                            isPythonMode = true; isHtmlMode = false; isJsMode = false; isBrainMode = false; continue; 
+                        }
+                        if ((lowerLine.startsWith("insert html (") || lowerLine.startsWith("import:html (")) && line.endsWith(")")) {
+                            isHtmlMode = true; isPythonMode = false; isJsMode = false; isBrainMode = false; continue; 
+                        }
+                        if ((lowerLine.startsWith("insert javascript (") || lowerLine.startsWith("import:javascript (")) && line.endsWith(")")) {
+                            isJsMode = true; isHtmlMode = false; isPythonMode = false; isBrainMode = false; continue; 
+                        }
+
+                        if (isPythonMode) {
+                            let noSpaceLine = line.replace(/\s+/g, ''); 
+                            if (noSpaceLine.startsWith('print("') && noSpaceLine.endsWith('")')) {
+                                let firstQuote = line.indexOf('"'); let lastQuote = line.lastIndexOf('"');
+                                terminal.innerHTML += line.substring(firstQuote + 1, lastQuote) + "\n";
+                            }
+                            continue;
+                        }
+
+                        if (isHtmlMode) { htmlContent += rawLine + "\n"; continue; }
+                        if (isJsMode) { jsContent += rawLine + "\n"; continue; }
                     }
                 }
             }
+
+            // Start the parser with all the lines!
+            await processLines(allLines);
 
             // Inject compiled web code
             let finalWebCode = htmlContent + "\n<script>" + jsContent + "<\/script>";
@@ -248,16 +319,13 @@ print ("hi")
             const userMsg = inputField.value;
 
             if (!userMsg) return;
-
             terminal.innerHTML += `\nYou: ${userMsg}\n`;
             inputField.value = ""; 
 
             try {
                 terminal.innerHTML += `<span style="color:gray;" id="chatLoadingIndicator">Isaahi is typing...</span>\n`;
                 terminal.scrollTop = terminal.scrollHeight; 
-
                 let aiResponse = await callGroqAPI(currentAiPrompt, userMsg);
-                
                 document.getElementById("chatLoadingIndicator").remove();
                 terminal.innerHTML += `<span class="ai-text">Isaahi AI: ${aiResponse}</span>\n\n`;
                 terminal.scrollTop = terminal.scrollHeight; 
