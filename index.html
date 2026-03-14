@@ -1,4 +1,34 @@
-<script>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>sbfb Playground</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f9; }
+        textarea { width: 100%; height: 200px; font-family: monospace; font-size: 16px; padding: 10px; }
+        button { background-color: #4CAF50; color: white; padding: 10px 20px; border: none; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        button:hover { background-color: #45a049; }
+        .output-box { background-color: black; color: #00FF00; padding: 15px; margin-top: 20px; font-family: monospace; white-space: pre-wrap; min-height: 150px; }
+    </style>
+</head>
+<body>
+
+    <h1>Try sbfb Live!</h1>
+    <p>Write your sbfb code below and hit Run:</p>
+
+    <textarea id="codeInput">
+start:sbfb
+idk(frontend)
+
+insert python (test.py)
+print("hi")
+
+<end></textarea>
+
+    <button onclick="runSBFB()">Run Code</button>
+
+    <div class="output-box" id="outputScreen">Waiting for code...</div>
+
+    <script>
         function runSBFB() {
             const code = document.getElementById("codeInput").value;
             const output = document.getElementById("outputScreen");
@@ -7,7 +37,7 @@
 
             const lines = code.split('\n');
             let isRunning = false;
-            let isPythonMode = false; // New! This tracks if we are inside a Python block
+            let isPythonMode = false; // Tracks if we are inside a Python block
 
             for (let i = 0; i < lines.length; i++) {
                 let line = lines[i].trim();
@@ -31,12 +61,11 @@
                         let filename = line.substring(15, line.length - 1);
                         output.innerText += `[System Note: Inserting Python script '${filename}']\n`;
                         isPythonMode = true; // Flip the switch!
-                        continue; // Move to the next line
+                        continue; 
                     }
 
                     // 2. If we are in Python Mode, look for Python commands
                     if (isPythonMode) {
-                        // Look for print("...")
                         if (line.startsWith('print("') && line.endsWith('")')) {
                             let text = line.substring(7, line.length - 2);
                             output.innerText += text + "\n";
@@ -44,7 +73,7 @@
                         else {
                             output.innerText += `Python Error: sbfb's mini-python doesn't recognize '${line}' yet\n`;
                         }
-                        continue; // Skip the rest of the sbfb checks below
+                        continue; // Skip the standard sbfb checks below
                     }
 
                     // 3. If we are NOT in Python mode, do normal sbfb commands
@@ -63,3 +92,6 @@
             }
         }
     </script>
+
+</body>
+</html>
