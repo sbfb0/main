@@ -1,73 +1,168 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>SBFB Type Studio</title>
+    <meta charset="UTF-8">
+    <title>SBFB Type Studio | Professional IDE</title>
     <style>
         * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background: #1e1e1e; color: #fff; }
-        .workspace { display: flex; gap: 20px; height: 90vh; }
-        .panel { flex: 1; display: flex; flex-direction: column; }
-        textarea { flex: 1; background: #2d2d2d; color: #d4d4d4; padding: 15px; border: 1px solid #444; font-family: monospace; resize: none; outline: none; }
-        .terminal { flex: 1; background: #000; color: #00FF00; padding: 15px; font-family: monospace; overflow-y: auto; border: 1px solid #333; white-space: pre-wrap; }
-        .btn { background: #4CAF50; color: white; padding: 10px; border: none; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        .api-bar { margin-bottom: 10px; display: flex; gap: 10px; }
-        .api-bar input { background: #2d2d2d; border: 1px solid #444; color: white; padding: 5px; flex: 1; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 20px; background: #1e1e1e; color: #fff; overflow: hidden; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: #252526; padding: 10px; border-radius: 8px; border: 1px solid #333; }
+        .workspace { display: flex; gap: 15px; height: calc(100vh - 100px); }
+        .panel { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Editor Styles */
+        textarea { flex: 1; background: #1e1e1e; color: #d4d4d4; padding: 20px; border: 1px solid #333; border-radius: 8px; font-family: 'Consolas', 'Monaco', monospace; font-size: 14px; resize: none; outline: none; line-height: 1.5; }
+        textarea:focus { border-color: #4CAF50; }
+
+        /* Output Styles */
+        .terminal { flex: 1; background: #000; color: #00FF00; padding: 15px; font-family: 'Consolas', monospace; overflow-y: auto; border: 1px solid #333; border-radius: 8px; white-space: pre-wrap; font-size: 13px; }
+        .preview-box { flex: 1; background: white; border-radius: 8px; border: none; }
+        
+        .btn-run { background: #4CAF50; color: white; padding: 10px 25px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-run:hover { background: #45a049; transform: scale(1.05); }
+        .api-input { background: #333; border: 1px solid #444; color: white; padding: 8px; border-radius: 4px; width: 250px; }
+        
+        .error-text { color: #ff5555; }
+        .sys-text { color: #569cd6; }
+        .var-text { color: #ce9178; }
     </style>
 </head>
 <body>
-    <div class="api-bar">
-        <input type="password" id="groqApiKey" placeholder="Enter Groq API Key">
-        <button onclick="runSBFB()" class="btn" style="margin:0;">Run Code</button>
+
+    <div class="top-bar">
+        <div style="font-weight: bold; color: #4CAF50;">⚡ SBFB TYPE-CODE IDE</div>
+        <div style="display: flex; gap: 10px;">
+            <input type="password" id="groqApiKey" class="api-input" placeholder="Groq API Key (Optional)">
+            <button onclick="runSBFB()" class="btn-run">▶ RUN PROGRAM</button>
+        </div>
     </div>
+
     <div class="workspace">
         <div class="panel">
             <textarea id="codeInput" spellcheck="false">start:SBFB
-type ("Hello SBFB!")
+frontend
+
+type ("--- Testing SBFB Memory ---")
+
+let myName = "Creator"
+let loopCount = 3
+
+type ("Welcome to the system, ")
+type (myName)
+
+type ("")
+type ("--- Testing SBFB Loops ---")
+
+repeat loopCount {
+    type ("SBFB is looping!")
+}
+
 <end:SBFB></textarea>
         </div>
+
         <div class="panel">
-            <iframe id="webPreview" style="background:white; height:50%; border:none;"></iframe>
+            <iframe id="webPreview" class="preview-box"></iframe>
             <div id="outputScreen" class="terminal">Terminal ready...</div>
         </div>
     </div>
 
     <script>
-        // --- URL LOADER ---
+        // Check for Shared Code via URL
         window.onload = function() {
             const params = new URLSearchParams(window.location.search);
-            const sharedCode = params.get('code');
-            if (sharedCode) {
-                document.getElementById("codeInput").value = decodeURIComponent(sharedCode);
-                runSBFB();
+            const shared = params.get('code');
+            if (shared) {
+                document.getElementById("codeInput").value = decodeURIComponent(shared);
+                setTimeout(runSBFB, 500); // Auto-run after a short delay
             }
+            const savedKey = localStorage.getItem("sbfb_api_key");
+            if (savedKey) document.getElementById("groqApiKey").value = savedKey;
         };
 
         async function runSBFB() {
             const code = document.getElementById("codeInput").value;
             const terminal = document.getElementById("outputScreen");
             const preview = document.getElementById("webPreview");
-            terminal.innerHTML = "--- Running SBFB ---\n";
+            const apiKey = document.getElementById("groqApiKey").value;
             
-            let memory = {};
-            const lines = code.split('\n');
-            let isRunning = false;
+            if (apiKey) localStorage.setItem("sbfb_api_key", apiKey);
 
-            for (let line of lines) {
-                let clean = line.trim();
-                if (clean.toLowerCase() === "start:sbfb") { isRunning = true; continue; }
-                if (clean.toLowerCase() === "<end:sbfb>") break;
-                
-                if (isRunning) {
-                    if (clean.startsWith('type ("')) {
-                        terminal.innerHTML += clean.split('"')[1] + "\n";
-                    }
-                    if (clean.startsWith('let ')) {
-                        let parts = clean.substring(4).split('=');
-                        memory[parts[0].trim()] = parts[1].trim().replace(/"/g, '');
+            terminal.innerHTML = "<span class='sys-text'>--- Initializing SBFB Engine ---</span>\n";
+            preview.srcdoc = ""; // Clear preview
+
+            let memory = {};
+            let isRunning = false;
+            let htmlContent = "";
+            const lines = code.split('\n');
+
+            // --- HELPER: Process Logic ---
+            async function executeBatch(linesArray) {
+                for (let i = 0; i < linesArray.length; i++) {
+                    let line = linesArray[i].trim();
+                    let lowerLine = line.toLowerCase();
+
+                    if (lowerLine === "start:sbfb") { isRunning = true; continue; }
+                    if (lowerLine === "<end:sbfb>" || lowerLine === "<end>") { isRunning = false; break; }
+
+                    if (isRunning && line !== "") {
+                        // 1. Variable Assignment (let x = y)
+                        if (lowerLine.startsWith("let ")) {
+                            let parts = line.substring(4).split("=");
+                            let varName = parts[0].trim();
+                            let varVal = parts[1].trim().replace(/"/g, '');
+                            // Handle simple math or variable reference
+                            if (memory[varVal] !== undefined) {
+                                memory[varName] = memory[varVal];
+                            } else {
+                                memory[varName] = isNaN(varVal) ? varVal : Number(varVal);
+                            }
+                            continue;
+                        }
+
+                        // 2. Printing (type)
+                        if (lowerLine.startsWith("type (") && line.endsWith(")")) {
+                            let content = line.substring(line.indexOf("(") + 1, line.lastIndexOf(")")).trim();
+                            if (content.startsWith('"')) {
+                                terminal.innerHTML += content.replace(/"/g, '') + "\n";
+                            } else {
+                                terminal.innerHTML += (memory[content] || `<span class='error-text'>Undefined: ${content}</span>`) + "\n";
+                            }
+                            continue;
+                        }
+
+                        // 3. Loops (repeat x { ... })
+                        if (lowerLine.startsWith("repeat ") && lowerLine.endsWith("{")) {
+                            let countKey = lowerLine.substring(7, lowerLine.length - 1).trim();
+                            let count = isNaN(countKey) ? (memory[countKey] || memory[Object.keys(memory).find(k => k.toLowerCase() === countKey)]) : parseInt(countKey);
+                            
+                            let loopLines = [];
+                            let depth = 1;
+                            i++;
+                            while (i < linesArray.length && depth > 0) {
+                                if (linesArray[i].includes("{")) depth++;
+                                if (linesArray[i].includes("}")) depth--;
+                                if (depth > 0) loopLines.push(linesArray[i]);
+                                i++;
+                            }
+                            i--; // Adjust index
+
+                            for (let l = 0; l < (count || 0); l++) {
+                                await executeBatch(loopLines);
+                            }
+                            continue;
+                        }
+
+                        // 4. HTML Injection
+                        if (lowerLine === "frontend") {
+                            terminal.innerHTML += "<span class='sys-text'>[System: Environment FRONTEND]</span>\n";
+                            continue;
+                        }
                     }
                 }
             }
-            terminal.innerHTML += "--- Finished ---";
+
+            await executeBatch(lines);
+            terminal.innerHTML += "<span class='sys-text'>--- Program Finished ---</span>";
         }
     </script>
 </body>
