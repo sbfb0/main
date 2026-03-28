@@ -6,25 +6,30 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 20px; background: #1e1e1e; color: #fff; overflow: hidden; }
+        
+        /* Layout */
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: #252526; padding: 10px; border-radius: 8px; border: 1px solid #333; }
-        .workspace { display: flex; gap: 15px; height: calc(100vh - 100px); }
+        .file-controls { display: flex; gap: 8px; margin-bottom: 10px; }
+        .workspace { display: flex; gap: 15px; height: calc(100vh - 160px); }
         .panel { flex: 1; display: flex; flex-direction: column; gap: 10px; }
         
-        /* Editor Styles */
+        /* Buttons & Inputs */
+        .btn { padding: 8px 15px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; color: white; font-size: 12px; }
+        .btn-run { background: #4CAF50; padding: 10px 25px; font-size: 14px; }
+        .btn-run:hover { background: #45a049; transform: scale(1.05); }
+        .btn-file { background: #3e3e42; border: 1px solid #555; }
+        .btn-file:hover { background: #505050; }
+        .api-input { background: #333; border: 1px solid #444; color: white; padding: 8px; border-radius: 4px; width: 200px; }
+
+        /* Editor & Output */
         textarea { flex: 1; background: #1e1e1e; color: #d4d4d4; padding: 20px; border: 1px solid #333; border-radius: 8px; font-family: 'Consolas', 'Monaco', monospace; font-size: 14px; resize: none; outline: none; line-height: 1.5; }
         textarea:focus { border-color: #4CAF50; }
-
-        /* Output Styles */
         .terminal { flex: 1; background: #000; color: #00FF00; padding: 15px; font-family: 'Consolas', monospace; overflow-y: auto; border: 1px solid #333; border-radius: 8px; white-space: pre-wrap; font-size: 13px; }
         .preview-box { flex: 1; background: white; border-radius: 8px; border: none; }
         
-        .btn-run { background: #4CAF50; color: white; padding: 10px 25px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .btn-run:hover { background: #45a049; transform: scale(1.05); }
-        .api-input { background: #333; border: 1px solid #444; color: white; padding: 8px; border-radius: 4px; width: 250px; }
-        
+        /* Text Highlighting Classes */
         .error-text { color: #ff5555; }
         .sys-text { color: #569cd6; }
-        .var-text { color: #ce9178; }
     </style>
 </head>
 <body>
@@ -33,8 +38,16 @@
         <div style="font-weight: bold; color: #4CAF50;">⚡ SBFB TYPE-CODE IDE</div>
         <div style="display: flex; gap: 10px;">
             <input type="password" id="groqApiKey" class="api-input" placeholder="Groq API Key (Optional)">
-            <button onclick="runSBFB()" class="btn-run">▶ RUN PROGRAM</button>
+            <button onclick="runSBFB()" class="btn btn-run">▶ RUN PROGRAM</button>
         </div>
+    </div>
+
+    <div class="file-controls">
+        <button class="btn btn-file" onclick="newFile()">📄 New File</button>
+        <button class="btn btn-file" onclick="document.getElementById('fileOpener').click()">📂 Open .sbfb</button>
+        <button class="btn btn-file" onclick="saveFile()">💾 Save .sbfb</button>
+        <input type="file" id="fileOpener" accept=".sbfb" style="display:none" onchange="loadFile(event)">
+        <span id="fileNameDisplay" style="margin-left:10px; color:#888; font-size:12px; align-self:center;">unsaved_project.sbfb</span>
     </div>
 
     <div class="workspace">
@@ -42,19 +55,32 @@
             <textarea id="codeInput" spellcheck="false">start:SBFB
 frontend
 
-type ("--- Testing SBFB Memory ---")
-
+type ("--- Testing SBFB Math & Memory ---")
 let myName = "Creator"
-let loopCount = 3
+let baseScore = 10
+let bonus = 5
+let total = baseScore + bonus
 
-type ("Welcome to the system, ")
+type ("Welcome ")
 type (myName)
+type ("Your starting score is: ")
+type (total)
 
 type ("")
-type ("--- Testing SBFB Loops ---")
+type ("--- Testing Upgraded Loops ---")
+
+let loopCount = 3
+let counter = 1
 
 repeat loopCount {
-    type ("SBFB is looping!")
+    type ("Loop iteration: ")
+    type (counter)
+    
+    render ("<h1 style='color:blue; font-family:sans-serif;'>Hello Loop ")
+    render (counter)
+    render ("</h1>")
+    
+    counter = counter + 1
 }
 
 <end:SBFB></textarea>
@@ -67,14 +93,38 @@ repeat loopCount {
     </div>
 
     <script>
-        // Check for Shared Code via URL
-        window.onload = function() {
-            const params = new URLSearchParams(window.location.search);
-            const shared = params.get('code');
-            if (shared) {
-                document.getElementById("codeInput").value = decodeURIComponent(shared);
-                setTimeout(runSBFB, 500); // Auto-run after a short delay
+        // --- FILE SYSTEM LOGIC ---
+        function newFile() {
+            if(confirm("Create new file? Unsaved changes will be lost.")) {
+                document.getElementById('codeInput').value = "start:SBFB\n\n<end:SBFB>";
+                document.getElementById('fileNameDisplay').innerText = "new_project.sbfb";
             }
+        }
+
+        function saveFile() {
+            const code = document.getElementById('codeInput').value;
+            const blob = new Blob([code], { type: 'text/plain' });
+            const anchor = document.createElement('a');
+            anchor.download = "program.sbfb";
+            anchor.href = window.URL.createObjectURL(blob);
+            anchor.click();
+            window.URL.revokeObjectURL(anchor.href);
+        }
+
+        function loadFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('codeInput').value = e.target.result;
+                document.getElementById('fileNameDisplay').innerText = file.name;
+                runSBFB();
+            };
+            reader.readAsText(file);
+        }
+
+        // --- CORE ENGINE ---
+        window.onload = function() {
             const savedKey = localStorage.getItem("sbfb_api_key");
             if (savedKey) document.getElementById("groqApiKey").value = savedKey;
         };
@@ -88,14 +138,13 @@ repeat loopCount {
             if (apiKey) localStorage.setItem("sbfb_api_key", apiKey);
 
             terminal.innerHTML = "<span class='sys-text'>--- Initializing SBFB Engine ---</span>\n";
-            preview.srcdoc = ""; // Clear preview
+            preview.srcdoc = ""; 
 
             let memory = {};
             let isRunning = false;
             let htmlContent = "";
             const lines = code.split('\n');
 
-            // --- HELPER: Process Logic ---
             async function executeBatch(linesArray) {
                 for (let i = 0; i < linesArray.length; i++) {
                     let line = linesArray[i].trim();
@@ -105,16 +154,27 @@ repeat loopCount {
                     if (lowerLine === "<end:sbfb>" || lowerLine === "<end>") { isRunning = false; break; }
 
                     if (isRunning && line !== "") {
-                        // 1. Variable Assignment (let x = y)
-                        if (lowerLine.startsWith("let ")) {
-                            let parts = line.substring(4).split("=");
+                        
+                        // 1. Variable Assignment & Math
+                        let isAssignment = lowerLine.startsWith("let ") || (line.includes("=") && !line.includes("=="));
+                        if (isAssignment && !lowerLine.startsWith("type") && !lowerLine.startsWith("repeat") && !lowerLine.startsWith("render")) {
+                            let parts = line.replace(/^let\s+/i, '').split("=");
                             let varName = parts[0].trim();
-                            let varVal = parts[1].trim().replace(/"/g, '');
-                            // Handle simple math or variable reference
-                            if (memory[varVal] !== undefined) {
-                                memory[varName] = memory[varVal];
+                            let expression = parts[1].trim();
+
+                            if (expression.startsWith('"') && expression.endsWith('"')) {
+                                memory[varName] = expression.slice(1, -1);
                             } else {
-                                memory[varName] = isNaN(varVal) ? varVal : Number(varVal);
+                                let evalString = expression;
+                                for (let key in memory) {
+                                    let regex = new RegExp(`\\b${key}\\b`, "g");
+                                    evalString = evalString.replace(regex, memory[key]);
+                                }
+                                try {
+                                    memory[varName] = Function('"use strict";return (' + evalString + ')')();
+                                } catch(e) {
+                                    memory[varName] = expression;
+                                }
                             }
                             continue;
                         }
@@ -125,15 +185,27 @@ repeat loopCount {
                             if (content.startsWith('"')) {
                                 terminal.innerHTML += content.replace(/"/g, '') + "\n";
                             } else {
-                                terminal.innerHTML += (memory[content] || `<span class='error-text'>Undefined: ${content}</span>`) + "\n";
+                                terminal.innerHTML += (memory[content] !== undefined ? memory[content] : `<span class='error-text'>Undefined: ${content}</span>`) + "\n";
                             }
                             continue;
                         }
 
-                        // 3. Loops (repeat x { ... })
+                        // 3. Rendering (render)
+                        if (lowerLine.startsWith("render (") && line.endsWith(")")) {
+                            let content = line.substring(line.indexOf("(") + 1, line.lastIndexOf(")")).trim();
+                            if (content.startsWith('"')) {
+                                htmlContent += content.replace(/"/g, '');
+                            } else {
+                                htmlContent += (memory[content] !== undefined ? memory[content] : "");
+                            }
+                            preview.srcdoc = htmlContent;
+                            continue;
+                        }
+
+                        // 4. Loops
                         if (lowerLine.startsWith("repeat ") && lowerLine.endsWith("{")) {
                             let countKey = lowerLine.substring(7, lowerLine.length - 1).trim();
-                            let count = isNaN(countKey) ? (memory[countKey] || memory[Object.keys(memory).find(k => k.toLowerCase() === countKey)]) : parseInt(countKey);
+                            let count = isNaN(countKey) ? memory[countKey] : parseInt(countKey);
                             
                             let loopLines = [];
                             let depth = 1;
@@ -144,7 +216,7 @@ repeat loopCount {
                                 if (depth > 0) loopLines.push(linesArray[i]);
                                 i++;
                             }
-                            i--; // Adjust index
+                            i--; 
 
                             for (let l = 0; l < (count || 0); l++) {
                                 await executeBatch(loopLines);
@@ -152,7 +224,7 @@ repeat loopCount {
                             continue;
                         }
 
-                        // 4. HTML Injection
+                        // 5. Frontend Declaration
                         if (lowerLine === "frontend") {
                             terminal.innerHTML += "<span class='sys-text'>[System: Environment FRONTEND]</span>\n";
                             continue;
@@ -162,7 +234,8 @@ repeat loopCount {
             }
 
             await executeBatch(lines);
-            terminal.innerHTML += "<span class='sys-text'>--- Program Finished ---</span>";
+            terminal.innerHTML += "<span class='sys-text'>--- Program Finished ---</span>\n";
+            terminal.scrollTop = terminal.scrollHeight;
         }
     </script>
 </body>
