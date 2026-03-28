@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SBFB Type Studio | Professional IDE</title>
+    <link rel="manifest" href="manifest.json">
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 20px; background: #1e1e1e; color: #fff; overflow: hidden; }
@@ -127,6 +129,25 @@ repeat loopCount {
         window.onload = function() {
             const savedKey = localStorage.getItem("sbfb_api_key");
             if (savedKey) document.getElementById("groqApiKey").value = savedKey;
+
+            // Register PWA Service Worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js').catch(err => console.log("SW tools error:", err));
+            }
+
+            // Handle File Launch (Opening .sbfb from Windows)
+            if ('launchQueue' in window) {
+                launchQueue.setConsumer(async (launchParams) => {
+                    if (launchParams.files && launchParams.files.length) {
+                        const fileHandle = launchParams.files[0];
+                        const file = await fileHandle.getFile();
+                        const content = await file.text();
+                        document.getElementById('codeInput').value = content;
+                        document.getElementById('fileNameDisplay').innerText = file.name;
+                        runSBFB();
+                    }
+                });
+            }
         };
 
         async function runSBFB() {
@@ -155,7 +176,6 @@ repeat loopCount {
 
                     if (isRunning && line !== "") {
                         
-                        // 1. Variable Assignment & Math
                         let isAssignment = lowerLine.startsWith("let ") || (line.includes("=") && !line.includes("=="));
                         if (isAssignment && !lowerLine.startsWith("type") && !lowerLine.startsWith("repeat") && !lowerLine.startsWith("render")) {
                             let parts = line.replace(/^let\s+/i, '').split("=");
@@ -179,7 +199,6 @@ repeat loopCount {
                             continue;
                         }
 
-                        // 2. Printing (type)
                         if (lowerLine.startsWith("type (") && line.endsWith(")")) {
                             let content = line.substring(line.indexOf("(") + 1, line.lastIndexOf(")")).trim();
                             if (content.startsWith('"')) {
@@ -190,7 +209,6 @@ repeat loopCount {
                             continue;
                         }
 
-                        // 3. Rendering (render)
                         if (lowerLine.startsWith("render (") && line.endsWith(")")) {
                             let content = line.substring(line.indexOf("(") + 1, line.lastIndexOf(")")).trim();
                             if (content.startsWith('"')) {
@@ -202,7 +220,6 @@ repeat loopCount {
                             continue;
                         }
 
-                        // 4. Loops
                         if (lowerLine.startsWith("repeat ") && lowerLine.endsWith("{")) {
                             let countKey = lowerLine.substring(7, lowerLine.length - 1).trim();
                             let count = isNaN(countKey) ? memory[countKey] : parseInt(countKey);
@@ -224,7 +241,6 @@ repeat loopCount {
                             continue;
                         }
 
-                        // 5. Frontend Declaration
                         if (lowerLine === "frontend") {
                             terminal.innerHTML += "<span class='sys-text'>[System: Environment FRONTEND]</span>\n";
                             continue;
